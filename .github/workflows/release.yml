@@ -1,0 +1,48 @@
+# Builds WindowPilot-<version>.exe and publishes a GitHub Release whenever a version tag (e.g. v1.2.0) is pushed.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the tag matches version.py
+        shell: pwsh
+        run: |
+          $v = python -c "from version import __version__; print(__version__)"
+          if ("v$v" -ne "${{ github.ref_name }}") {
+            Write-Error "Tag ${{ github.ref_name }} does not match version.py ($v)"; exit 1
+          }
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Build the .exe
+        run: |
+          python make_version_info.py
+          pyinstaller --noconfirm --onefile --windowed --name "WindowPilot-${{ env.VERSION }}" --version-file file_version_info.txt --add-data "CHANGELOG.md;." --add-data "LICENSE;." --add-data "THIRD_PARTY_NOTICES.md;." --collect-all uiautomation --collect-all winotify --hidden-import pynput.keyboard._win32 --hidden-import pynput.mouse._win32 main.py
+
+      - name: Release notes from CHANGELOG.md
+        run: python changelog.py ${{ env.VERSION }} notes.md
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WindowPilot v${{ env.VERSION }}
+          body_path: notes.md
+          files: |
+            dist/WindowPilot-${{ env.VERSION }}.exe
+            LICENSE

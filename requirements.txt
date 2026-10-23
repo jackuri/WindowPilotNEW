@@ -1,0 +1,7 @@
+anthropic>=1.14
+mss>=9.0
+Pillow>=10.0
+pynput>=1.7.7
+psutil>=5.9
+winotify>=1.1
+uiautomation>=2.0.18
